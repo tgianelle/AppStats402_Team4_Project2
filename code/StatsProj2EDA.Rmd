@@ -1,0 +1,81 @@
+---
+title: "StatsProj2EDA"
+author: "Michael J Wolfe"
+date: "July 16, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Packages
+
+```{r}
+library(RCurl)
+```
+
+
+## Load Data
+
+```{r}
+heartURL <- getURL("https://raw.githubusercontent.com/mjwolfe91/AppStats402_Team4_Project2/master/data/framingham.csv")
+heartData <- read.csv(text=heartURL, header=TRUE)
+#heartData <- read.csv('C:/Users/micha/OneDrive/Desktop/SMU MSDS/Applied Stats/Project 2/Data/framingham.csv')
+head(heartData)
+```
+
+## EDA
+
+```{r pairs}
+sapply(heartData, class)
+```
+
+Change integers into factors.
+
+```{r pairs}
+cols_factor <- c("male", "education", "currentSmoker", "BPMeds", "prevalentStroke", "prevalentHyp", "diabetes", "TenYearCHD")
+heartData[cols_factor] <- lapply(heartData[cols_factor], factor)
+```
+
+Sums of columns.
+
+```{r}
+numeric_cols <- subset(heartData, select = -c(male, education, currentSmoker, BPMeds, prevalentStroke, prevalentHyp, diabetes, TenYearCHD))
+colSums(numeric_cols)
+colSums(is.na(heartData))
+```
+
+Histograms
+
+```{r histograms}
+for (i in colnames(numeric_cols)){
+  hist(heartData[[i]])
+}
+```
+```{r summary}
+summary(heartData)
+```
+```{r pairs correlation}
+pairs(numeric_cols)
+cor(numeric_cols)
+```
+
+```{r ftables}
+ftable(addmargins(table(heartData$TenYearCHD,heartData$currentSmoker))) 
+ftable(addmargins(table(heartData$TenYearCHD,heartData$male))) 
+ftable(addmargins(table(heartData$TenYearCHD,heartData$education ))) 
+```
+
+```{r ftables}
+ftable(addmargins(table(heartData$TenYearCHD,heartData$currentSmoker))) 
+ftable(addmargins(table(heartData$TenYearCHD,heartData$male))) 
+ftable(addmargins(table(heartData$TenYearCHD,heartData$education ))) 
+```
+
+
+
+
+
+
+
