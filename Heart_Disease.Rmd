@@ -1,0 +1,292 @@
+---
+title: "Untitled"
+author: "Spencer Fogelman"
+date: "7/28/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+df = read.csv('/Users/spencerfogelman/Desktop/framingham.csv', header = TRUE)
+head(df)
+```
+
+#Rename columns
+
+```{r recode}
+#https://dplyr.tidyverse.org/reference/recode.html
+library(dplyr)
+df$male = recode(df$male, '1' = 'male', '0' = 'female')
+names(df)[1] = 'Gender'
+unique(df$Gender)
+```
+
+```{r}
+df$education = recode(df$education, '1'='SomeHighSchool', '2'='FinishedHighSchool/GED',
+       '3'='SomeCollege/VocationalSchool', '4'='College')
+unique(df$education)
+```
+
+```{r}
+df$currentSmoker = recode(df$currentSmoker, '1'='Yes', '0'='No')
+unique(df$currentSmoker)
+```
+```{r}
+df$BPMeds = recode(df$BPMeds, '1'='Yes', '0'='No')
+unique(df$BPMeds)
+```
+```{r}
+unique(df$prevalentStroke)
+df$prevalentStroke = recode(df$prevalentStroke, '1'='Yes', '0'='No')
+```
+```{r}
+unique(df$prevalentHyp)
+df$prevalentHyp = recode(df$prevalentHyp, '1'='Yes', '0'='No')
+```
+```{r}
+unique(df$TenYearCHD)
+df$TenYearCHD = recode(df$TenYearCHD, '1'='Yes', '0'='No')
+```
+```{r}
+unique(df$diabetes)
+df$diabetes = recode(df$diabetes, '1'='Yes', '0'='No')
+```
+
+#Missingness 
+```{r}
+summary(df)
+#Missing values in cigsPerDay, totChol, heartRate, glucose
+```
+
+```{r}
+dim(df)
+dim(na.omit(df))
+3658/4240
+#kept 86 percent of data by dropping incomplete observations. I will drop the oberservations
+```
+```{r}
+df = na.omit(df)
+dim(df)
+```
+
+#Changing data types
+```{r}
+df$Gender = as.factor(df$Gender)
+df$education = as.factor(df$education)
+df$currentSmoker = as.factor(df$currentSmoker)
+df$BPMeds = as.factor(df$BPMeds)
+df$prevalentStroke = as.factor(df$BPMeds)
+df$prevalentHyp = as.factor(df$prevalentHyp)
+df$diabetes = as.factor(df$diabetes)
+df$TenYearCHD = as.factor(df$TenYearCHD)
+```
+
+```{r}
+summary(df)
+#df is now clean
+```
+
+```{r}
+levels(df$TenYearCHD)
+df$TenYearCHD = relevel(df$TenYearCHD, ref='No')
+#Now our interpretations will be a person with _ is _ more likely to be diagnosed with heart disease.
+```
+
+#summary stats for continuous variables
+```{r glucose}
+aggregate(glucose~TenYearCHD, data=df, summary)
+library(ggplot2)
+ggplot(df, aes(x=TenYearCHD, y=glucose)) + geom_boxplot()
+# hard to tell with this many outliers. does not seem like there is a correlation
+```
+
+```{r heartrate}
+aggregate(heartRate~TenYearCHD, data=df, summary)
+ggplot(df, aes(x=TenYearCHD, y=heartRate)) + geom_boxplot()
+#does not seem like there is a correlation
+```
+
+```{r BMI}
+aggregate(BMI~TenYearCHD, data=df, summary)
+ggplot(df, aes(x=TenYearCHD, y=BMI)) + geom_boxplot()
+#seems like high BMI is associated with heart disease
+```
+
+```{r diastolic BP}
+aggregate(diaBP~TenYearCHD, data=df, summary)
+ggplot(df, aes(x=TenYearCHD, y=diaBP)) + geom_boxplot()
+#higher diastolic bp seems to be related to heart disease
+```
+
+```{r systolic BP}
+aggregate(sysBP~TenYearCHD, data=df, summary)
+ggplot(df, aes(x=TenYearCHD, y=sysBP)) + geom_boxplot()
+#higher systolic bp seems to be associated with heart disease
+```
+
+```{r total cholesterol}
+aggregate(totChol~TenYearCHD, data=df, summary)
+ggplot(df, aes(x=TenYearCHD, y=totChol)) + geom_boxplot()
+#higher total cholesterol seems to associated with heart disease
+```
+
+```{r cigarettes per day}
+aggregate(cigsPerDay~TenYearCHD, data=df, summary)
+ggplot(df, aes(x=TenYearCHD, y=cigsPerDay)) + geom_boxplot()
+#higher cigs per day seems to be associated with heart disease
+#what to do with outliers?
+```
+
+```{r age}
+aggregate(age~TenYearCHD, data=df, summary)
+ggplot(df, aes(x=TenYearCHD, y=age)) + geom_boxplot()
+#higher age seems to be associated with heart disease
+```
+#Multicollinearity
+```{r}
+attach(df)
+pairs(~ age + cigsPerDay + totChol + sysBP + diaBP + BMI + heartRate + glucose, data=df)
+#seems to be strong linear correlation between systolic BP and diastolic BP, and
+#weaker correlation between both and BMI
+```
+
+```{r}
+pairs(~ age + cigsPerDay + totChol + sysBP + diaBP + BMI + heartRate + glucose, data=df,
+      col=TenYearCHD)
+#seems like age does a really good job at separation
+```
+
+```{r}
+df %>% select(age, cigsPerDay, totChol, sysBP, diaBP, BMI, heartRate, glucose) %>%
+  cor()
+#probably would remove either sysBP or diaBP
+```
+
+
+#EDA for categorical variables
+
+```{r diabetes}
+prop.table(table(TenYearCHD,diabetes),2)
+plot(TenYearCHD~diabetes,col=c("red","blue"))
+#seems to be association between having diabetes and heart disease
+#class imbalance
+```
+
+```{r prevalentHyp}
+prop.table(table(TenYearCHD,prevalentHyp),2)
+plot(TenYearCHD~prevalentHyp,col=c("red","blue"))
+#prevalent hypertension associated with heart disease
+```
+
+```{r prevalentStroke}
+prop.table(table(TenYearCHD,prevalentStroke),2)
+plot(TenYearCHD~prevalentStroke,col=c("red","blue"))
+#stroke associated with heart disease
+#class imbalance
+```
+
+```{r BPMeds}
+prop.table(table(TenYearCHD,BPMeds),2)
+plot(TenYearCHD~BPMeds,col=c("red","blue"))
+#BP meds associated with heart disease
+#class imbalance
+```
+
+```{r currentSmoker}
+prop.table(table(TenYearCHD,currentSmoker),2)
+plot(TenYearCHD~currentSmoker,col=c("red","blue"))
+#does not seem to be associated with heart disease which is strange
+```
+
+```{r education}
+prop.table(table(TenYearCHD,education),2)
+mosaicplot(TenYearCHD~education, las=1, main = 'Education vs Heart Disease')
+#seems like as education increases, heart disease decreases
+```
+
+```{r gender}
+prop.table(table(TenYearCHD,currentSmoker),2)
+plot(TenYearCHD~Gender,col=c("red","blue"), las=1)
+#males seem more likely to get heart disease
+```
+
+#Fitting Logistic Regression Model
+#Drop sysBA
+
+```{r}
+df_model = select(df, -sysBP)
+names(df_model)
+```
+
+```{r}
+model.full = glm(TenYearCHD ~ Gender + age + education + currentSmoker + cigsPerDay +
+                   BPMeds + prevalentHyp + prevalentStroke + diabetes +
+                   totChol + diaBP + BMI + heartRate + glucose , data=df_model,
+                 family = binomial(link="logit"))
+
+```
+
+```{r}
+library(car)
+(vif(model.full)[,3])^2
+```
+```{r}
+alias(model.full)
+```
+
+```{r}
+plot(prevalentStroke~BPMeds, col=c('red', 'blue'))
+table(prevalentStroke, BPMeds)
+#all people who have strokes on BPmeds
+```
+
+```{r}
+model.full = glm(TenYearCHD ~ Gender + age + education + currentSmoker + cigsPerDay +
+                   BPMeds + prevalentHyp + diabetes +
+                   totChol + diaBP + BMI + heartRate + glucose , data=df_model,
+                 family = binomial(link="logit"))
+vif(model.full)[,3]^2
+#vifs seem good
+```
+
+```{r}
+summary(model.full)
+```
+
+```{r}
+exp(cbind("Odds ratio" = coef(model.full), confint.default(model.full, level = 0.95)))
+```
+
+```{r forward selection}
+model.null<-glm(TenYearCHD ~ 1, data=df_model,family = binomial(link="logit"))
+step(model.null,
+     scope = list(upper=model.full),
+     direction="forward",
+     test="Chisq",
+     data=df_model)
+```
+
+```{r}
+model_1 = glm(TenYearCHD~age+prevalentHyp+cigsPerDay+glucose+Gender+diaBP+totChol,
+              data=df_model, family = binomial(link="logit"))
+exp(cbind("Odds ratio" = coef(model_1), confint.default(model_1, level = 0.95)))
+#interpreations all make sense
+```
+
+```{r}
+summary(model_1)
+```
+
+```{r}
+plot(model_1)
+#no outliers
+```
+
+```{r ROC}
+library(pROC)
+roc(model_1)
+```
+
