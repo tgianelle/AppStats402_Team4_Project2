@@ -13,8 +13,11 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 library(RCurl)
+library(dplyr)
+library(ggplot2)
+library(gplots)
 ```
-
+THe city of Framingham is concerned about the long term health of some of its citizens. In this exercise we will test probability models on a variety of factors that lead to coronary heart disease and recommend one solution.
 
 ## Load Data
 
@@ -25,55 +28,240 @@ heartData <- read.csv(text=heartURL, header=TRUE)
 head(heartData)
 ```
 
+Some of these data have categories that aren't particularly intuitive. Let's recode some of them.
+
+## Rename columns
+
+```{r recode}
+#https://dplyr.tidyverse.org/reference/recode.html
+
+heartData$male = recode(heartData$male, '1' = 'male', '0' = 'female')
+names(heartData)[1] = 'Gender'
+unique(heartData$Gender)
+
+heartData$education = recode(heartData$education, '1'='SomeHighSchool', '2'='FinishedHighSchool/GED',
+       '3'='SomeCollege/VocationalSchool', '4'='College')
+unique(heartData$education)
+
+heartData$currentSmoker = recode(heartData$currentSmoker, '1'='Yes', '0'='No')
+unique(heartData$currentSmoker)
+
+heartData$BPMeds = recode(heartData$BPMeds, '1'='Yes', '0'='No')
+unique(heartData$BPMeds)
+
+unique(heartData$prevalentStroke)
+heartData$prevalentStroke = recode(heartData$prevalentStroke, '1'='Yes', '0'='No')
+
+unique(heartData$prevalentHyp)
+heartData$prevalentHyp = recode(heartData$prevalentHyp, '1'='Yes', '0'='No')
+
+unique(heartData$TenYearCHD)
+heartData$TenYearCHD = recode(heartData$TenYearCHD, '1'='Yes', '0'='No')
+
+unique(heartData$diabetes)
+heartData$diabetes = recode(heartData$diabetes, '1'='Yes', '0'='No')
+```
+
 ## EDA
+
+## Column analysis and cleanup
+
+Let's first confirm that our datatypes agree with the analysis we want to do.
 
 ```{r pairs}
 sapply(heartData, class)
 ```
 
-Change integers into factors.
+Those character columns would do better as factors, so let's change them.
 
 ```{r pairs}
-cols_factor <- c("male", "education", "currentSmoker", "BPMeds", "prevalentStroke", "prevalentHyp", "diabetes", "TenYearCHD")
+cols_factor <- c("Gender", "education", "currentSmoker", "BPMeds", "prevalentStroke", "prevalentHyp", "diabetes", "TenYearCHD")
 heartData[cols_factor] <- lapply(heartData[cols_factor], factor)
 ```
 
-Sums of columns.
+Now let's take some sums and summaries.
 
 ```{r}
-numeric_cols <- subset(heartData, select = -c(male, education, currentSmoker, BPMeds, prevalentStroke, prevalentHyp, diabetes, TenYearCHD))
+numeric_cols <- subset(heartData, select = -c(Gender, education, currentSmoker, BPMeds, prevalentStroke, prevalentHyp, diabetes, TenYearCHD))
 colSums(numeric_cols)
 colSums(is.na(heartData))
+summary(heartData)
 ```
 
-Histograms
+Looks like there's some missing values in cigsPerDay, totChol, heartRate, and glucose. Let's see how much leverage these values have.
+
+```{r}
+dim(heartData)
+dim(na.omit(heartData))
+3658/4240
+```
+
+We can keep 86% of our values, so let's go ahead and remove these rows.
+
+```{r}
+heartData = na.omit(heartData)
+dim(heartData)
+summary(heartData)
+```
+
+Much better! However, it would be easier to interpret the model outcome as a person with _ is _ more likely to be diagnosed with heart disease, so let's adjust the response variable accordingly.
+
+```{r}
+levels(heartData$TenYearCHD)
+heartData$TenYearCHD = relevel(heartData$TenYearCHD, ref='No')
+```
+
+## Continuous variables
+
+Let's start by checking correlations.
+
+```{r glucose}
+aggregate(glucose~TenYearCHD, data=heartData, summary)
+ggplot(heartData, aes(x=TenYearCHD, y=glucose)) + geom_boxplot()
+```
+
+Lots of outliers here. Hard to say if there is correlation because of this.
+
+```{r heartrate}
+aggregate(heartRate~TenYearCHD, data=heartData, summary)
+ggplot(heartData, aes(x=TenYearCHD, y=heartRate)) + geom_boxplot()
+```
+
+No correlation here.
+
+```{r BMI}
+aggregate(BMI~TenYearCHD, data=heartData, summary)
+ggplot(heartData, aes(x=TenYearCHD, y=BMI)) + geom_boxplot()
+```
+
+Looks like high BMI and heart disease might be correlated.
+
+```{r diastolic BP}
+aggregate(diaBP~TenYearCHD, data=heartData, summary)
+ggplot(heartData, aes(x=TenYearCHD, y=diaBP)) + geom_boxplot()
+```
+
+Similarly appears that high diastolic BP correlates to ten year CHD.
+
+```{r systolic BP}
+aggregate(sysBP~TenYearCHD, data=heartData, summary)
+ggplot(heartData, aes(x=TenYearCHD, y=sysBP)) + geom_boxplot()
+```
+
+Same with systolic BP.
+
+```{r total cholesterol}
+aggregate(totChol~TenYearCHD, data=heartData, summary)
+ggplot(heartData, aes(x=TenYearCHD, y=totChol)) + geom_boxplot()
+```
+
+Again with cholesterol.
+
+```{r cigarettes per day}
+aggregate(cigsPerDay~TenYearCHD, data=heartData, summary)
+ggplot(heartData, aes(x=TenYearCHD, y=cigsPerDay)) + geom_boxplot()
+```
+
+Yet again with cigarette use. Lots of outliers here too.
+
+```{r age}
+aggregate(age~TenYearCHD, data=heartData, summary)
+ggplot(heartData, aes(x=TenYearCHD, y=age)) + geom_boxplot()
+```
+
+Higher age appears to be associated with CHD as well.
+
+Let's run some histograms.
 
 ```{r histograms}
 for (i in colnames(numeric_cols)){
   hist(heartData[[i]])
 }
 ```
-```{r summary}
-summary(heartData)
-```
+
+Mostly normally distributed with a couple exceptions. Now let's check mutlicolinearity and correlations.
+
 ```{r pairs correlation}
-pairs(numeric_cols)
-cor(numeric_cols)
+pairs(~ age + cigsPerDay + totChol + sysBP + diaBP + BMI + heartRate + glucose, data=heartData)
+pairs(~ age + cigsPerDay + totChol + sysBP + diaBP + BMI + heartRate + glucose, data=heartData,
+      col=TenYearCHD)
+heartData.cor <- heartData %>% select(age, cigsPerDay, totChol, sysBP, diaBP, BMI, heartRate, glucose) %>%
+  cor()
+heartData.cor
+heatmap.2(heartData.cor,col=redgreen(20), 
+          density.info="none", trace="none", dendrogram=c("row"), 
+          symm=F,symkey=T,symbreaks=T, scale="none")
 ```
+
+There's a strong correlation between systolic blood pressure and diastolic blood pressure...which makes practical sense considering they are essentially the same measure. Age does a good job of stratifying the variables and reducing multicollinearity. Two takeaways from this - first might be to remove either systolic or diastolic BP, second is to perhaps create interactions on the age variable.
+
+## Categorical variables
+
+Next let's check the categorical variables, first by measuring and plotting proportionality.
+
+```{r diabetes}
+attach(heartData)
+prop.table(table(TenYearCHD,diabetes),2)
+plot(TenYearCHD~diabetes,col=c("red","blue"))
+```
+
+There appears to be an unbalanced response rate. We will need to keep this in mind when creating training data, and will likely necessitate a correction to the coefficient. It also appears that prevalent diabetes is associated with ten year CHD.
+
+```{r prevalentHyp}
+prop.table(table(TenYearCHD,prevalentHyp),2)
+plot(TenYearCHD~prevalentHyp,col=c("red","blue"))
+```
+
+Again we see prevalent hypertension associated with ten year CHD.
+
+```{r prevalentStroke}
+prop.table(table(TenYearCHD,prevalentStroke),2)
+plot(TenYearCHD~prevalentStroke,col=c("red","blue"))
+```
+
+Another association
+
+```{r BPMeds}
+prop.table(table(TenYearCHD,BPMeds),2)
+plot(TenYearCHD~BPMeds,col=c("red","blue"))
+```
+
+Another association, and class imbalance
+
+```{r currentSmoker}
+prop.table(table(TenYearCHD,currentSmoker),2)
+plot(TenYearCHD~currentSmoker,col=c("red","blue"))
+```
+
+Oddly appears that there is no association between smoking and ten year CHD
+
+```{r education}
+prop.table(table(TenYearCHD,education),2)
+mosaicplot(TenYearCHD~education, las=1, main = 'Education vs Heart Disease')
+```
+
+Higher education appears to have lower rates of ten year CHD.
+
+```{r gender}
+prop.table(table(TenYearCHD,currentSmoker),2)
+plot(TenYearCHD~Gender,col=c("red","blue"), las=1)
+```
+
+Males appear to develop CHD more often.
 
 ```{r ftables}
 ftable(addmargins(table(heartData$TenYearCHD,heartData$currentSmoker))) 
-ftable(addmargins(table(heartData$TenYearCHD,heartData$male))) 
-ftable(addmargins(table(heartData$TenYearCHD,heartData$education ))) 
+ftable(addmargins(table(heartData$TenYearCHD,heartData$Gender))) 
+ftable(addmargins(table(heartData$TenYearCHD,heartData$education))) 
+ftable(addmargins(table(heartData$TenYearCHD,heartData$BPMeds))) 
+ftable(addmargins(table(heartData$TenYearCHD,heartData$prevalentStroke))) 
+ftable(addmargins(table(heartData$TenYearCHD,heartData$prevalentHyp))) 
+ftable(addmargins(table(heartData$TenYearCHD,heartData$diabetes)))
 ```
 
 ```{r ftables}
-ftable(addmargins(table(heartData$TenYearCHD,heartData$currentSmoker))) 
-ftable(addmargins(table(heartData$TenYearCHD,heartData$male))) 
-ftable(addmargins(table(heartData$TenYearCHD,heartData$education ))) 
+heartData_rm <- heartData[-c(diaBP)]
 ```
-
-
 
 
 
