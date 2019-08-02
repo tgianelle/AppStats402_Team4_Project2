@@ -259,11 +259,19 @@ ftable(addmargins(table(heartData$TenYearCHD,heartData$prevalentHyp)))
 ftable(addmargins(table(heartData$TenYearCHD,heartData$diabetes)))
 ```
 
-```{r ftables}
-heartData_rm <- heartData[-c(diaBP)]
+Let's see if we can reduce this dataset down to a few principle components.
+
+```{r pca}
+pc.result<-prcomp(numeric_cols,scale.=TRUE)
+pc.scores<-pc.result$x
+pc.scores<-data.frame(pc.scores)
+pc.scores$TenYearCDH<-heartData$TenYearCHD
+ggplot(data = pc.scores, aes(x = PC1, y = PC2)) +
+  geom_point(aes(col=TenYearCDH), size=1)+
+  ggtitle("PCA of Framingham Heart Disease Data")
 ```
 
-
+Separation isn't great here. This might not be the way to go.
 
 
 
